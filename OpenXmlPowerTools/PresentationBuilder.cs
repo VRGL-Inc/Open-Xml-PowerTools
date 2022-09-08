@@ -127,6 +127,7 @@ namespace OpenXmlPowerTools
                     { VML.stroke,         new [] { R.id }},
                     { WNE.toolbarData,    new [] { R.id }},
                     { Plegacy.textdata,   new [] { XName.Get("id") }},
+                    { SVG.svgBlip,        new [] { R.embed }},
                 };
 
             List<ImageData> images = new List<ImageData>();
@@ -1180,7 +1181,7 @@ namespace OpenXmlPowerTools
                     newPart.AddExternalRelationship(oldRel.RelationshipType, oldRel.Uri, newRid);
                     UpdateContent(newContent, e.Name, relId, newRid);
                 }
-                if (e.Name == A.blip || e.Name == A14.imgLayer || e.Name == A.audioFile || e.Name == A.videoFile || e.Name == A.quickTimeFile)
+                if (e.Name == A.blip || e.Name == A14.imgLayer || e.Name == A.audioFile || e.Name == A.videoFile || e.Name == A.quickTimeFile || e.Name == SVG.svgBlip)
                 {
                     string relId = (string)e.Attribute(R.link);
                     if (string.IsNullOrEmpty(relId))
