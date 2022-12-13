@@ -1,8 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <PackageId>VRGL.OpenXmlPowerTools</PackageId>
     <TargetFrameworks>$(ProductTargetFrameworks)</TargetFrameworks>
-    <Authors>Eric White;Thomas Barnekow</Authors>
+    <Authors>Eric White;Thomas Barnekow;VRGL</Authors>
     <Title>Open XML PowerTools</Title>
     <Description>
       The Open XML PowerTools provides guidance and example code for programming with Open XML Documents (DOCX, XLSX, and PPTX).
@@ -26,10 +27,14 @@
       Copyright 2012-2017 Microsoft Corporation.
       Copyright 2018-2021 Eric White.
       Copyright 2016-2021 Thomas Barnekow.
+      Copyright 2022-2022 VRGL.
     </Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/EricWhiteDev/Open-Xml-PowerTools</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/EricWhiteDev/Open-Xml-PowerTools</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/VRGL-Inc/Open-Xml-PowerTools</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/VRGL-Inc/Open-Xml-PowerTools</RepositoryUrl>
+    <AssemblyVersion>1.0.2.0</AssemblyVersion>
+    <FileVersion>1.0.2.0</FileVersion>
+    <Version>1.0.2</Version>
   </PropertyGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
