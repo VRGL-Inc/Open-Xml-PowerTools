@@ -1718,10 +1718,7 @@ namespace OpenXmlPowerTools
                 using (Stream oldObject = oldPart.GetStream(FileMode.Open, FileAccess.Read))
                 using (Stream newObject = newPart.GetStream(FileMode.Create, FileAccess.ReadWrite))
                 {
-                    int byteCount;
-                    byte[] buffer = new byte[65536];
-                    while ((byteCount = oldObject.Read(buffer, 0, 65536)) != 0)
-                        newObject.Write(buffer, 0, byteCount);
+                    oldObject.CopyTo(newObject);
                 }
                 extendedReference.Attribute(attributeName).Value = relId;
             }
