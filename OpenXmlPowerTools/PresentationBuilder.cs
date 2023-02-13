@@ -8,8 +8,8 @@ using System.Linq;
 using System.Xml.Linq;
 using System.Text;
 using DocumentFormat.OpenXml.Packaging;
-using Microsoft.XmlDiffPatch;
 using System.Xml;
+using Org.XmlUnit.Builder;
 
 namespace OpenXmlPowerTools
 {
@@ -519,27 +519,16 @@ namespace OpenXmlPowerTools
 
         private static bool IsSameMasterParts(SlideMasterPart sourcePart, SlideMasterPart targetPart)
         {
-            var diffResult = false;
-            var xd = new XmlDiff();
-            StringBuilder sb = new();
-
             using XmlReader sourceMasterReader = sourcePart.GetXDocument().CreateReader();
             using XmlReader targetMasterReader = targetPart.GetXDocument().CreateReader();
-            using XmlWriter diff = XmlWriter.Create(sb);
 
-            diffResult = xd.Compare(sourceMasterReader, targetMasterReader, diff);
+            var diff = DiffBuilder.Compare(Input.From(sourcePart.GetXDocument()))
+                .WithTest(Input.From(targetPart.GetXDocument()))
+                .WithAttributeFilter(a =>
+                    XName.Get(a.LocalName, a.NamespaceURI) != R.id)
+                .Build();
 
-            if (!diffResult)
-            {
-                var diffDoc = XDocument.Parse(sb.ToString());
-                var changes = diffDoc.Descendants(XDiff.change)
-                    .Select(x => x.Attribute(XDiff.match).Value);
-
-                return changes.All(c =>
-                    string.Equals(c, "@r:id", StringComparison.OrdinalIgnoreCase));
-            }
-
-            return true;
+            return !diff.HasDifferences();
         }
 
         // Copies notes master and notesSz element from presentation

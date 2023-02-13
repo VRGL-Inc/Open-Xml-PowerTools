@@ -47,7 +47,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="XMLDiffPatch" Version="1.0.8.28" />
+    <PackageReference Include="XMLUnit.Core" Version="2.9.1" />
   </ItemGroup>
 
 </Project>
