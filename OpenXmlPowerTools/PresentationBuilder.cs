@@ -8,6 +8,8 @@ using System.Linq;
 using System.Xml.Linq;
 using System.Text;
 using DocumentFormat.OpenXml.Packaging;
+using Microsoft.XmlDiffPatch;
+using System.Xml;
 
 namespace OpenXmlPowerTools
 {
@@ -69,33 +71,33 @@ namespace OpenXmlPowerTools
 
     public static class PresentationBuilder
     {
-        public static void BuildPresentation(List<SlideSource> sources, string fileName)
+        public static void BuildPresentation(List<SlideSource> sources, string fileName, bool exactMasterCompare = false)
         {
             using (OpenXmlMemoryStreamDocument streamDoc = OpenXmlMemoryStreamDocument.CreatePresentationDocument())
             {
                 using (PresentationDocument output = streamDoc.GetPresentationDocument())
                 {
-                    BuildPresentation(sources, output);
+                    BuildPresentation(sources, output, exactMasterCompare);
                     output.Close();
                 }
                 streamDoc.GetModifiedDocument().SaveAs(fileName);
             }
         }
 
-        public static PmlDocument BuildPresentation(List<SlideSource> sources)
+        public static PmlDocument BuildPresentation(List<SlideSource> sources, bool exactMasterCompare = false)
         {
             using (OpenXmlMemoryStreamDocument streamDoc = OpenXmlMemoryStreamDocument.CreatePresentationDocument())
             {
                 using (PresentationDocument output = streamDoc.GetPresentationDocument())
                 {
-                    BuildPresentation(sources, output);
+                    BuildPresentation(sources, output, exactMasterCompare);
                     output.Close();
                 }
                 return streamDoc.GetModifiedPmlDocument();
             }
         }
 
-        private static void BuildPresentation(List<SlideSource> sources, PresentationDocument output)
+        private static void BuildPresentation(List<SlideSource> sources, PresentationDocument output, bool exactMasterCompare)
         {
             if (RelationshipMarkup == null)
                 RelationshipMarkup = new Dictionary<XName, XName[]>()
@@ -154,7 +156,7 @@ namespace OpenXmlPowerTools
                     {
                         if (sourceNum == 0)
                             CopyPresentationParts(doc, output, images, mediaList);
-                        currentMasterPart = AppendSlides(doc, output, source.Start, source.Count, source.KeepMaster, images, currentMasterPart, mediaList);
+                        currentMasterPart = AppendSlides(doc, output, source.Start, source.Count, source.KeepMaster, exactMasterCompare, images, currentMasterPart, mediaList);
                     }
                     catch (PresentationBuilderInternalException dbie)
                     {
@@ -391,7 +393,7 @@ namespace OpenXmlPowerTools
         }
 
         private static SlideMasterPart AppendSlides(PresentationDocument sourceDocument, PresentationDocument newDocument,
-            int start, int count, bool keepMaster, List<ImageData> images, SlideMasterPart currentMasterPart, List<MediaData> mediaList)
+            int start, int count, bool keepMaster, bool exactMasterCompare, List<ImageData> images, SlideMasterPart currentMasterPart, List<MediaData> mediaList)
         {
             XDocument newPresentation = newDocument.PresentationPart.GetXDocument();
             if (newPresentation.Root.Element(P.sldIdLst) == null)
@@ -405,14 +407,14 @@ namespace OpenXmlPowerTools
             {
                 var slideMasterPart = sourceDocument.PresentationPart.SlideMasterParts.FirstOrDefault();
                 if (slideMasterPart != null)
-                    currentMasterPart = CopyMasterSlide(sourceDocument, slideMasterPart, newDocument, newPresentation, images, mediaList);
+                    currentMasterPart = CopyMasterSlide(sourceDocument, slideMasterPart, newDocument, newPresentation, images, mediaList, exactMasterCompare);
                 return currentMasterPart;
             }
             while (count > 0 && start < slideList.Count())
             {
                 SlidePart slide = (SlidePart)sourceDocument.PresentationPart.GetPartById(slideList.ElementAt(start).Attribute(R.id).Value);
                 if (currentMasterPart == null || keepMaster)
-                    currentMasterPart = CopyMasterSlide(sourceDocument, slide.SlideLayoutPart.SlideMasterPart, newDocument, newPresentation, images, mediaList);
+                    currentMasterPart = CopyMasterSlide(sourceDocument, slide.SlideLayoutPart.SlideMasterPart, newDocument, newPresentation, images, mediaList, exactMasterCompare);
                 SlidePart newSlide = newDocument.PresentationPart.AddNewPart<SlidePart>();
                 newSlide.PutXDocument(slide.GetXDocument());
                 AddRelationships(slide, newSlide, new[] { newSlide.GetXDocument().Root });
@@ -454,7 +456,7 @@ namespace OpenXmlPowerTools
         }
 
         private static SlideMasterPart CopyMasterSlide(PresentationDocument sourceDocument, SlideMasterPart sourceMasterPart,
-            PresentationDocument newDocument, XDocument newPresentation, List<ImageData> images, List<MediaData> mediaList)
+            PresentationDocument newDocument, XDocument newPresentation, List<ImageData> images, List<MediaData> mediaList, bool exactMasterCompare)
         {
             // Search for existing master slide with same theme name
             XDocument oldTheme = sourceMasterPart.ThemePart.GetXDocument();
@@ -462,8 +464,12 @@ namespace OpenXmlPowerTools
             foreach (SlideMasterPart master in newDocument.PresentationPart.GetPartsOfType<SlideMasterPart>())
             {
                 XDocument themeDoc = master.ThemePart.GetXDocument();
-                if (themeDoc.Root.Attribute(NoNamespace.name).Value == themeName)
+
+                if (themeDoc.Root.Attribute(NoNamespace.name).Value == themeName 
+                    && (!exactMasterCompare || IsSameMasterParts(sourceMasterPart, master)))
+                {
                     return master;
+                }
             }
 
             SlideMasterPart newMaster = newDocument.PresentationPart.AddNewPart<SlideMasterPart>();
@@ -484,10 +490,12 @@ namespace OpenXmlPowerTools
                 new XAttribute(R.id, newDocument.PresentationPart.GetIdOfPart(newMaster))));
             newID++;
 
+            // Copy theme
             ThemePart newThemePart = newMaster.AddNewPart<ThemePart>();
             if (newDocument.PresentationPart.ThemePart == null)
                 newThemePart = newDocument.PresentationPart.AddPart(newThemePart);
             newThemePart.PutXDocument(oldTheme);
+
             CopyRelatedPartsForContentParts(newDocument, sourceMasterPart.ThemePart, newThemePart, new[] { newThemePart.GetXDocument().Root }, images, mediaList);
             foreach (SlideLayoutPart layoutPart in sourceMasterPart.SlideLayoutParts)
             {
@@ -507,6 +515,31 @@ namespace OpenXmlPowerTools
             CopyRelatedPartsForContentParts(newDocument, sourceMasterPart, newMaster, new[] { newMaster.GetXDocument().Root }, images, mediaList);
 
             return newMaster;
+        }
+
+        private static bool IsSameMasterParts(SlideMasterPart sourcePart, SlideMasterPart targetPart)
+        {
+            var diffResult = false;
+            var xd = new XmlDiff();
+            StringBuilder sb = new();
+
+            using XmlReader sourceMasterReader = sourcePart.GetXDocument().CreateReader();
+            using XmlReader targetMasterReader = targetPart.GetXDocument().CreateReader();
+            using XmlWriter diff = XmlWriter.Create(sb);
+
+            diffResult = xd.Compare(sourceMasterReader, targetMasterReader, diff);
+
+            if (!diffResult)
+            {
+                var diffDoc = XDocument.Parse(sb.ToString());
+                var changes = diffDoc.Descendants(XDiff.change)
+                    .Select(x => x.Attribute(XDiff.match).Value);
+
+                return changes.All(c =>
+                    string.Equals(c, "@r:id", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return true;
         }
 
         // Copies notes master and notesSz element from presentation
