@@ -4026,12 +4026,4 @@ namespace OpenXmlPowerTools
         public static readonly XName samp = "samp";
         public static readonly XName pre = "pre";
     }
-
-    public static class XDiff
-    {
-        public static readonly XNamespace xhtml = "http://schemas.microsoft.com/xmltools/2002/xmldiff";
-        public static readonly XName change = xhtml + "change";
-
-        public static readonly string match = "match";
-    }
 }
