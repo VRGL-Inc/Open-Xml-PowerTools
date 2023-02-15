@@ -1760,7 +1760,11 @@ namespace OpenXmlPowerTools
 
                 var oldRelId = relId;
                 relId = newContentPart.GetIdOfPart(newPart);
-                newPart.FeedData(oldPart.GetStream(FileMode.Open, FileAccess.Read));
+                using (Stream oldObject = oldPart.GetStream(FileMode.Open, FileAccess.Read))
+                using (Stream newObject = newPart.GetStream(FileMode.Create, FileAccess.ReadWrite))
+                {
+                    oldObject.CopyTo(newObject);
+                }
                 extendedReference.Attribute(attributeName).Value = relId;
                 oldPart.AddAnnotation(new RIdAnnotation { Source = oldRelId, New = relId });
             }
