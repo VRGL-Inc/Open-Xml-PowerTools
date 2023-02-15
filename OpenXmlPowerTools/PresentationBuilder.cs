@@ -10,9 +10,17 @@ using System.Text;
 using DocumentFormat.OpenXml.Packaging;
 using System.Xml;
 using Org.XmlUnit.Builder;
+using System.Diagnostics;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace OpenXmlPowerTools
 {
+    public class RIdAnnotation
+    {
+        public string Source { get; set; }
+        public string New { get; set; }
+    }
+
     public class SlideSource
     {
         public PmlDocument PmlDocument { get; set; }
@@ -519,16 +527,22 @@ namespace OpenXmlPowerTools
 
         private static bool IsSameMasterParts(SlideMasterPart sourcePart, SlideMasterPart targetPart)
         {
-            using XmlReader sourceMasterReader = sourcePart.GetXDocument().CreateReader();
-            using XmlReader targetMasterReader = targetPart.GetXDocument().CreateReader();
-
             var diff = DiffBuilder.Compare(Input.From(sourcePart.GetXDocument()))
                 .WithTest(Input.From(targetPart.GetXDocument()))
-                .WithAttributeFilter(a =>
-                    XName.Get(a.LocalName, a.NamespaceURI) != R.id)
+                .WithAttributeFilter(IsConstantMasterAttribute)
                 .Build();
 
             return !diff.HasDifferences();
+        }
+
+        private static bool IsConstantMasterAttribute(XmlAttribute a)
+        {
+            if(MasterVariableAttributes.Map.TryGetValue(a.LocalName, out var xname))
+            {
+                return !xname.Any(x => x == XName.Get(a.LocalName, a.NamespaceURI));
+            }
+
+            return true;
         }
 
         // Copies notes master and notesSz element from presentation
@@ -1591,6 +1605,14 @@ namespace OpenXmlPowerTools
                     return;
 
                 ExtendedPart oldPart = (ExtendedPart)oldContentPart.GetPartById(relId);
+                var existingRef = oldPart.Annotation<RIdAnnotation>();
+                if(existingRef != null && existingRef.Source == relId)
+                {
+                    // Reference same relation if referenced already
+                    extendedReference.Attribute(attributeName).Value = existingRef.New;
+                    return;
+                }
+
                 FileInfo fileInfo = new FileInfo(oldPart.Uri.OriginalString);
                 ExtendedPart newPart = null;
 
@@ -1736,9 +1758,11 @@ namespace OpenXmlPowerTools
                 else if (newContentPart is XmlSignaturePart)
                     newPart = ((XmlSignaturePart)newContentPart).AddExtendedPart(oldPart.RelationshipType, oldPart.ContentType, fileInfo.Extension);
 
+                var oldRelId = relId;
                 relId = newContentPart.GetIdOfPart(newPart);
-                newPart.FeedData(oldPart.GetStream());
+                newPart.FeedData(oldPart.GetStream(FileMode.Open, FileAccess.Read));
                 extendedReference.Attribute(attributeName).Value = relId;
+                oldPart.AddAnnotation(new RIdAnnotation { Source = oldRelId, New = relId });
             }
             catch (ArgumentOutOfRangeException)
             {
